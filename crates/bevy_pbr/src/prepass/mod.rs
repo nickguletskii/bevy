@@ -51,6 +51,7 @@ use crate::{
     SetMeshBindGroup, MAX_CASCADES_PER_LIGHT, MAX_DIRECTIONAL_LIGHTS,
 };
 
+use bevy_render::texture::OwnedTextureDescriptor;
 use std::{hash::Hash, marker::PhantomData};
 
 pub const PREPASS_SHADER_HANDLE: HandleUntyped =
@@ -768,8 +769,8 @@ pub fn prepare_prepass_textures(
             depth_textures
                 .entry(camera.target.clone())
                 .or_insert_with(|| {
-                    let descriptor = TextureDescriptor {
-                        label: Some("prepass_depth_texture"),
+                    let descriptor = OwnedTextureDescriptor {
+                        label: Some("prepass_depth_texture".to_string()),
                         size,
                         mip_level_count: 1,
                         sample_count: msaa.samples(),
@@ -778,7 +779,7 @@ pub fn prepare_prepass_textures(
                         usage: TextureUsages::COPY_DST
                             | TextureUsages::RENDER_ATTACHMENT
                             | TextureUsages::TEXTURE_BINDING,
-                        view_formats: &[],
+                        view_formats: vec![],
                     };
                     texture_cache.get(&render_device, descriptor)
                 })
@@ -791,8 +792,8 @@ pub fn prepare_prepass_textures(
                 .or_insert_with(|| {
                     texture_cache.get(
                         &render_device,
-                        TextureDescriptor {
-                            label: Some("prepass_normal_texture"),
+                        OwnedTextureDescriptor {
+                            label: Some("prepass_normal_texture".to_string()),
                             size,
                             mip_level_count: 1,
                             sample_count: msaa.samples(),
@@ -800,7 +801,7 @@ pub fn prepare_prepass_textures(
                             format: NORMAL_PREPASS_FORMAT,
                             usage: TextureUsages::RENDER_ATTACHMENT
                                 | TextureUsages::TEXTURE_BINDING,
-                            view_formats: &[],
+                            view_formats: vec![],
                         },
                     )
                 })
@@ -813,8 +814,8 @@ pub fn prepare_prepass_textures(
                 .or_insert_with(|| {
                     texture_cache.get(
                         &render_device,
-                        TextureDescriptor {
-                            label: Some("prepass_motion_vectors_textures"),
+                        OwnedTextureDescriptor {
+                            label: Some("prepass_motion_vectors_textures".to_string()),
                             size,
                             mip_level_count: 1,
                             sample_count: msaa.samples(),
@@ -822,7 +823,7 @@ pub fn prepare_prepass_textures(
                             format: MOTION_VECTOR_PREPASS_FORMAT,
                             usage: TextureUsages::RENDER_ATTACHMENT
                                 | TextureUsages::TEXTURE_BINDING,
-                            view_formats: &[],
+                            view_formats: vec![],
                         },
                     )
                 })

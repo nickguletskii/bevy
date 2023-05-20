@@ -1,5 +1,5 @@
 use crate::{
-    render_graph::{NodeState, RenderGraph, SlotInfos, SlotLabel, SlotType, SlotValue},
+    render_graph::{InputSlotDescriptor, NodeState, RenderGraph, SlotLabel, SlotValue},
     render_resource::{Buffer, Sampler, TextureView},
 };
 use bevy_ecs::entity::Entity;
@@ -59,112 +59,6 @@ impl<'a> RenderGraphContext<'a> {
         self.inputs
     }
 
-    /// Returns the [`SlotInfos`] of the inputs.
-    pub fn input_info(&self) -> &SlotInfos {
-        &self.node.input_slots
-    }
-
-    /// Returns the [`SlotInfos`] of the outputs.
-    pub fn output_info(&self) -> &SlotInfos {
-        &self.node.output_slots
-    }
-
-    /// Retrieves the input slot value referenced by the `label`.
-    pub fn get_input(&self, label: impl Into<SlotLabel>) -> Result<&SlotValue, InputSlotError> {
-        let label = label.into();
-        let index = self
-            .input_info()
-            .get_slot_index(label.clone())
-            .ok_or(InputSlotError::InvalidSlot(label))?;
-        Ok(&self.inputs[index])
-    }
-
-    // TODO: should this return an Arc or a reference?
-    /// Retrieves the input slot value referenced by the `label` as a [`TextureView`].
-    pub fn get_input_texture(
-        &self,
-        label: impl Into<SlotLabel>,
-    ) -> Result<&TextureView, InputSlotError> {
-        let label = label.into();
-        match self.get_input(label.clone())? {
-            SlotValue::TextureView(value) => Ok(value),
-            value => Err(InputSlotError::MismatchedSlotType {
-                label,
-                actual: value.slot_type(),
-                expected: SlotType::TextureView,
-            }),
-        }
-    }
-
-    /// Retrieves the input slot value referenced by the `label` as a [`Sampler`].
-    pub fn get_input_sampler(
-        &self,
-        label: impl Into<SlotLabel>,
-    ) -> Result<&Sampler, InputSlotError> {
-        let label = label.into();
-        match self.get_input(label.clone())? {
-            SlotValue::Sampler(value) => Ok(value),
-            value => Err(InputSlotError::MismatchedSlotType {
-                label,
-                actual: value.slot_type(),
-                expected: SlotType::Sampler,
-            }),
-        }
-    }
-
-    /// Retrieves the input slot value referenced by the `label` as a [`Buffer`].
-    pub fn get_input_buffer(&self, label: impl Into<SlotLabel>) -> Result<&Buffer, InputSlotError> {
-        let label = label.into();
-        match self.get_input(label.clone())? {
-            SlotValue::Buffer(value) => Ok(value),
-            value => Err(InputSlotError::MismatchedSlotType {
-                label,
-                actual: value.slot_type(),
-                expected: SlotType::Buffer,
-            }),
-        }
-    }
-
-    /// Retrieves the input slot value referenced by the `label` as an [`Entity`].
-    pub fn get_input_entity(&self, label: impl Into<SlotLabel>) -> Result<Entity, InputSlotError> {
-        let label = label.into();
-        match self.get_input(label.clone())? {
-            SlotValue::Entity(value) => Ok(*value),
-            value => Err(InputSlotError::MismatchedSlotType {
-                label,
-                actual: value.slot_type(),
-                expected: SlotType::Entity,
-            }),
-        }
-    }
-
-    /// Sets the output slot value referenced by the `label`.
-    pub fn set_output(
-        &mut self,
-        label: impl Into<SlotLabel>,
-        value: impl Into<SlotValue>,
-    ) -> Result<(), OutputSlotError> {
-        let label = label.into();
-        let value = value.into();
-        let slot_index = self
-            .output_info()
-            .get_slot_index(label.clone())
-            .ok_or_else(|| OutputSlotError::InvalidSlot(label.clone()))?;
-        let slot = self
-            .output_info()
-            .get_slot(slot_index)
-            .expect("slot is valid");
-        if value.slot_type() != slot.slot_type {
-            return Err(OutputSlotError::MismatchedSlotType {
-                label,
-                actual: slot.slot_type,
-                expected: value.slot_type(),
-            });
-        }
-        self.outputs[slot_index] = Some(value);
-        Ok(())
-    }
-
     pub fn view_entity(&self) -> Entity {
         self.view_entity.unwrap()
     }
@@ -190,14 +84,14 @@ impl<'a> RenderGraphContext<'a> {
             .get_sub_graph(&name)
             .ok_or_else(|| RunSubGraphError::MissingSubGraph(name.clone()))?;
         if let Some(input_node) = sub_graph.get_input_node() {
-            for (i, input_slot) in input_node.input_slots.iter().enumerate() {
+            for (i, input_slot) in input_node.node.input().iter().enumerate() {
                 if let Some(input_value) = inputs.get(i) {
-                    if input_slot.slot_type != input_value.slot_type() {
+                    if input_slot.slot_descriptor != input_value.input_slot_descriptor() {
                         return Err(RunSubGraphError::MismatchedInputSlotType {
                             graph_name: name,
                             slot_index: i,
-                            actual: input_value.slot_type(),
-                            expected: input_slot.slot_type,
+                            actual: input_value.input_slot_descriptor(),
+                            expected: input_slot.slot_descriptor,
                             label: input_slot.name.clone().into(),
                         });
                     }
@@ -246,8 +140,8 @@ pub enum RunSubGraphError {
         graph_name: Cow<'static, str>,
         slot_index: usize,
         label: SlotLabel,
-        expected: SlotType,
-        actual: SlotType,
+        expected: InputSlotDescriptor,
+        actual: InputSlotDescriptor,
     },
 }
 
@@ -258,8 +152,8 @@ pub enum OutputSlotError {
     #[error("attempted to output a value of type `{actual}` to output slot `{label:?}`, which has type `{expected}`")]
     MismatchedSlotType {
         label: SlotLabel,
-        expected: SlotType,
-        actual: SlotType,
+        expected: InputSlotDescriptor,
+        actual: InputSlotDescriptor,
     },
 }
 
@@ -270,7 +164,7 @@ pub enum InputSlotError {
     #[error("attempted to retrieve a value of type `{actual}` from input slot `{label:?}`, which has type `{expected}`")]
     MismatchedSlotType {
         label: SlotLabel,
-        expected: SlotType,
-        actual: SlotType,
+        expected: InputSlotDescriptor,
+        actual: InputSlotDescriptor,
     },
 }

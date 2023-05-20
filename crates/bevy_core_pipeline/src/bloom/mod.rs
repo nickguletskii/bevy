@@ -13,6 +13,7 @@ use bevy_asset::{load_internal_asset, HandleUntyped};
 use bevy_ecs::{prelude::*, query::QueryItem};
 use bevy_math::UVec2;
 use bevy_reflect::TypeUuid;
+use bevy_render::texture::OwnedTextureDescriptor;
 use bevy_render::{
     camera::ExtractedCamera,
     extract_component::{
@@ -347,8 +348,8 @@ fn prepare_bloom_textures(
             let mip_count = MAX_MIP_DIMENSION.ilog2().max(2) - 1;
             let mip_height_ratio = MAX_MIP_DIMENSION as f32 / height as f32;
 
-            let texture_descriptor = TextureDescriptor {
-                label: Some("bloom_texture"),
+            let texture_descriptor = OwnedTextureDescriptor {
+                label: Some("bloom_texture".to_string()),
                 size: Extent3d {
                     width: ((width as f32 * mip_height_ratio).round() as u32).max(1),
                     height: ((height as f32 * mip_height_ratio).round() as u32).max(1),
@@ -359,7 +360,7 @@ fn prepare_bloom_textures(
                 dimension: TextureDimension::D2,
                 format: BLOOM_TEXTURE_FORMAT,
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
+                view_formats: vec![],
             };
 
             #[cfg(any(not(feature = "webgl"), not(target_arch = "wasm32")))]

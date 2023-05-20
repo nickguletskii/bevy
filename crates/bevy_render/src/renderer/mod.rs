@@ -6,6 +6,7 @@ use bevy_utils::tracing::{error, info, info_span};
 pub use graph_runner::*;
 pub use render_device::*;
 
+use crate::texture::TextureCache;
 use crate::{
     render_graph::RenderGraph,
     render_phase::TrackedRenderPass,

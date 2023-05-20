@@ -897,7 +897,7 @@ pub fn prepare_lights(
     for (entity, extracted_view, clusters, environment_map) in &views {
         let point_light_depth_texture = texture_cache.get(
             &render_device,
-            TextureDescriptor {
+            OwnedTextureDescriptor {
                 size: Extent3d {
                     width: point_light_shadow_map.size as u32,
                     height: point_light_shadow_map.size as u32,
@@ -907,14 +907,14 @@ pub fn prepare_lights(
                 sample_count: 1,
                 dimension: TextureDimension::D2,
                 format: SHADOW_FORMAT,
-                label: Some("point_light_shadow_map_texture"),
+                label: Some("point_light_shadow_map_texture".to_string()),
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
+                view_formats: vec![],
             },
         );
         let directional_light_depth_texture = texture_cache.get(
             &render_device,
-            TextureDescriptor {
+            OwnedTextureDescriptor {
                 size: Extent3d {
                     width: (directional_light_shadow_map.size as u32)
                         .min(render_device.limits().max_texture_dimension_2d),
@@ -928,9 +928,9 @@ pub fn prepare_lights(
                 sample_count: 1,
                 dimension: TextureDimension::D2,
                 format: SHADOW_FORMAT,
-                label: Some("directional_light_shadow_map_texture"),
+                label: Some("directional_light_shadow_map_texture".to_string()),
                 usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
+                view_formats: vec![],
             },
         );
         let mut view_lights = Vec::new();

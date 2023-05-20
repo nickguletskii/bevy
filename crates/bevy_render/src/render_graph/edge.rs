@@ -12,7 +12,7 @@ use super::NodeId;
 /// The former simply states that the `output_node` has to be run before the `input_node`,
 /// while the later connects an output slot of the `output_node`
 /// with an input slot of the `input_node` to pass additional data along.
-/// For more information see [`SlotType`](super::SlotType).
+/// For more information see [`SlotType`](super::InputSlotDescriptor).
 ///
 /// [`RenderGraph::add_node_edge`]: crate::render_graph::RenderGraph::add_node_edge
 /// [`RenderGraph::add_slot_edge`]: crate::render_graph::RenderGraph::add_slot_edge

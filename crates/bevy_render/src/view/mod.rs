@@ -5,6 +5,7 @@ use bevy_asset::{load_internal_asset, HandleUntyped};
 pub use visibility::*;
 pub use window::*;
 
+use crate::texture::OwnedTextureDescriptor;
 use crate::{
     camera::{ExtractedCamera, TemporalJitter},
     extract_resource::{ExtractResource, ExtractResourcePlugin},
@@ -397,7 +398,7 @@ fn prepare_view_targets(
                 let main_textures = textures
                     .entry((camera.target.clone(), view.hdr))
                     .or_insert_with(|| {
-                        let descriptor = TextureDescriptor {
+                        let descriptor = OwnedTextureDescriptor {
                             label: None,
                             size,
                             mip_level_count: 1,
@@ -407,27 +408,27 @@ fn prepare_view_targets(
                             usage: TextureUsages::RENDER_ATTACHMENT
                                 | TextureUsages::TEXTURE_BINDING,
                             view_formats: match main_texture_format {
-                                TextureFormat::Bgra8Unorm => &[TextureFormat::Bgra8UnormSrgb],
-                                TextureFormat::Rgba8Unorm => &[TextureFormat::Rgba8UnormSrgb],
-                                _ => &[],
+                                TextureFormat::Bgra8Unorm => vec![TextureFormat::Bgra8UnormSrgb],
+                                TextureFormat::Rgba8Unorm => vec![TextureFormat::Rgba8UnormSrgb],
+                                _ => vec![],
                             },
                         };
                         MainTargetTextures {
                             a: texture_cache
                                 .get(
                                     &render_device,
-                                    TextureDescriptor {
-                                        label: Some("main_texture_a"),
-                                        ..descriptor
+                                    OwnedTextureDescriptor {
+                                        label: Some("main_texture_a".to_string()),
+                                        ..descriptor.clone()
                                     },
                                 )
                                 .default_view,
                             b: texture_cache
                                 .get(
                                     &render_device,
-                                    TextureDescriptor {
-                                        label: Some("main_texture_b"),
-                                        ..descriptor
+                                    OwnedTextureDescriptor {
+                                        label: Some("main_texture_b".to_string()),
+                                        ..descriptor.clone()
                                     },
                                 )
                                 .default_view,
@@ -435,15 +436,15 @@ fn prepare_view_targets(
                                 texture_cache
                                     .get(
                                         &render_device,
-                                        TextureDescriptor {
-                                            label: Some("main_texture_sampled"),
+                                        OwnedTextureDescriptor {
+                                            label: Some("main_texture_sampled".to_string()),
                                             size,
                                             mip_level_count: 1,
                                             sample_count: msaa.samples(),
                                             dimension: TextureDimension::D2,
                                             format: main_texture_format,
                                             usage: TextureUsages::RENDER_ATTACHMENT,
-                                            view_formats: descriptor.view_formats,
+                                            view_formats: descriptor.view_formats.to_vec(),
                                         },
                                     )
                                     .default_view

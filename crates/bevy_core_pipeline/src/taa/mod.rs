@@ -16,6 +16,7 @@ use bevy_ecs::{
 };
 use bevy_math::vec2;
 use bevy_reflect::{Reflect, TypeUuid};
+use bevy_render::texture::OwnedTextureDescriptor;
 use bevy_render::{
     camera::{ExtractedCamera, TemporalJitter},
     prelude::{Camera, Projection},
@@ -486,7 +487,7 @@ fn prepare_taa_history_textures(
 ) {
     for (entity, camera, view) in &views {
         if let Some(physical_viewport_size) = camera.physical_viewport_size {
-            let mut texture_descriptor = TextureDescriptor {
+            let mut texture_descriptor = OwnedTextureDescriptor {
                 label: None,
                 size: Extent3d {
                     depth_or_array_layers: 1,
@@ -502,13 +503,13 @@ fn prepare_taa_history_textures(
                     TextureFormat::bevy_default()
                 },
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-                view_formats: &[],
+                view_formats: vec![],
             };
 
-            texture_descriptor.label = Some("taa_history_1_texture");
+            texture_descriptor.label = Some("taa_history_1_texture".to_string());
             let history_1_texture = texture_cache.get(&render_device, texture_descriptor.clone());
 
-            texture_descriptor.label = Some("taa_history_2_texture");
+            texture_descriptor.label = Some("taa_history_2_texture".to_string());
             let history_2_texture = texture_cache.get(&render_device, texture_descriptor);
 
             let textures = if frame_count.0 % 2 == 0 {

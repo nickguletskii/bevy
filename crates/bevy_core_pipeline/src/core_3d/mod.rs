@@ -32,6 +32,7 @@ pub use main_transparent_pass_3d_node::*;
 
 use bevy_app::{App, Plugin};
 use bevy_ecs::prelude::*;
+use bevy_render::texture::OwnedTextureDescriptor;
 use bevy_render::{
     camera::{Camera, ExtractedCamera},
     extract_component::ExtractComponentPlugin,
@@ -281,7 +282,7 @@ pub fn prepare_core_3d_depth_textures(
             .entry(camera.target.clone())
             .or_insert_with(|| {
                 // Default usage required to write to the depth texture
-                let mut usage = camera_3d.depth_texture_usages.into();
+                let mut usage: TextureUsages = camera_3d.depth_texture_usages.into();
                 if depth_prepass.is_some() {
                     // Required to read the output of the prepass
                     usage |= TextureUsages::COPY_SRC;
@@ -294,8 +295,8 @@ pub fn prepare_core_3d_depth_textures(
                     height: physical_target_size.y,
                 };
 
-                let descriptor = TextureDescriptor {
-                    label: Some("view_depth_texture"),
+                let descriptor = OwnedTextureDescriptor {
+                    label: Some("view_depth_texture".to_string()),
                     size,
                     mip_level_count: 1,
                     sample_count: msaa.samples(),
@@ -303,7 +304,7 @@ pub fn prepare_core_3d_depth_textures(
                     // PERF: vulkan docs recommend using 24 bit depth for better performance
                     format: TextureFormat::Depth32Float,
                     usage,
-                    view_formats: &[],
+                    view_formats: vec![],
                 };
 
                 texture_cache.get(&render_device, descriptor)

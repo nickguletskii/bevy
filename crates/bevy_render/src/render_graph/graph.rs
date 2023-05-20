@@ -1,7 +1,8 @@
+use crate::render_graph::ComputedSlotDescriptor;
 use crate::{
     render_graph::{
-        Edge, Node, NodeId, NodeLabel, NodeRunError, NodeState, RenderGraphContext,
-        RenderGraphError, SlotInfo, SlotLabel,
+        Edge, InputSlotInfo, Node, NodeId, NodeLabel, NodeRunError, NodeState, RenderGraphContext,
+        RenderGraphError, SlotLabel,
     },
     renderer::RenderContext,
 };
@@ -18,7 +19,7 @@ use super::EdgeExistence;
 /// The `RenderGraphRunner` is responsible for executing the entire graph each frame.
 ///
 /// It consists of three main components: [`Nodes`](Node), [`Edges`](Edge)
-/// and [`Slots`](super::SlotType).
+/// and [`Slots`](super::InputSlotDescriptor).
 ///
 /// Nodes are responsible for generating draw calls and operating on input and output slots.
 /// Edges specify the order of execution for nodes and connect input and output slots together.
@@ -72,7 +73,7 @@ impl RenderGraph {
     }
 
     /// Creates an [`GraphInputNode`] with the specified slots if not already present.
-    pub fn set_input(&mut self, inputs: Vec<SlotInfo>) -> NodeId {
+    pub fn set_input(&mut self, inputs: Vec<InputSlotInfo>) -> NodeId {
         assert!(self.input_node.is_none(), "Graph already has an input node");
 
         let id = self.add_node("GraphInputNode", GraphInputNode { inputs });
@@ -492,7 +493,7 @@ impl RenderGraph {
                     }
                 }
 
-                if output_slot.slot_type != input_slot.slot_type {
+                if output_slot.slot_descriptor != input_slot.slot_descriptor {
                     return Err(RenderGraphError::MismatchedNodeSlots {
                         output_node,
                         output_slot: output_index,
@@ -648,16 +649,19 @@ impl Debug for RenderGraph {
 /// A [`Node`] which acts as an entry point for a [`RenderGraph`] with custom inputs.
 /// It has the same input and output slots and simply copies them over when run.
 pub struct GraphInputNode {
-    inputs: Vec<SlotInfo>,
+    inputs: Vec<InputSlotInfo>,
 }
 
 impl Node for GraphInputNode {
-    fn input(&self) -> Vec<SlotInfo> {
+    fn input(&self) -> Vec<InputSlotInfo> {
         self.inputs.clone()
     }
 
-    fn output(&self) -> Vec<SlotInfo> {
-        self.inputs.clone()
+    fn get_outputs(
+        &self,
+        input_slot_descriptors: &[ComputedSlotDescriptor],
+    ) -> Vec<ComputedSlotDescriptor> {
+        input_slot_descriptors.to_vec()
     }
 
     fn run(
@@ -666,10 +670,7 @@ impl Node for GraphInputNode {
         _render_context: &mut RenderContext,
         _world: &World,
     ) -> Result<(), NodeRunError> {
-        for i in 0..graph.inputs().len() {
-            let input = graph.inputs()[i].clone();
-            graph.set_output(i, input)?;
-        }
+        // Special case in [`RenderGraphRunner::run_graph`]
         Ok(())
     }
 }
@@ -678,8 +679,8 @@ impl Node for GraphInputNode {
 mod tests {
     use crate::{
         render_graph::{
-            Edge, Node, NodeId, NodeRunError, RenderGraph, RenderGraphContext, RenderGraphError,
-            SlotInfo, SlotType,
+            Edge, InputSlotDescriptor, InputSlotInfo, Node, NodeId, NodeRunError, RenderGraph,
+            RenderGraphContext, RenderGraphError,
         },
         renderer::RenderContext,
     };
@@ -688,29 +689,29 @@ mod tests {
 
     #[derive(Debug)]
     struct TestNode {
-        inputs: Vec<SlotInfo>,
-        outputs: Vec<SlotInfo>,
+        inputs: Vec<InputSlotInfo>,
+        outputs: Vec<InputSlotInfo>,
     }
 
     impl TestNode {
         pub fn new(inputs: usize, outputs: usize) -> Self {
             TestNode {
                 inputs: (0..inputs)
-                    .map(|i| SlotInfo::new(format!("in_{i}"), SlotType::TextureView))
+                    .map(|i| InputSlotInfo::new(format!("in_{i}"), InputSlotDescriptor::Texture))
                     .collect(),
                 outputs: (0..outputs)
-                    .map(|i| SlotInfo::new(format!("out_{i}"), SlotType::TextureView))
+                    .map(|i| InputSlotInfo::new(format!("out_{i}"), InputSlotDescriptor::Texture))
                     .collect(),
             }
         }
     }
 
     impl Node for TestNode {
-        fn input(&self) -> Vec<SlotInfo> {
+        fn input(&self) -> Vec<InputSlotInfo> {
             self.inputs.clone()
         }
 
-        fn output(&self) -> Vec<SlotInfo> {
+        fn output(&self) -> Vec<InputSlotInfo> {
             self.outputs.clone()
         }
 

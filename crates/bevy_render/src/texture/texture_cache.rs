@@ -1,9 +1,11 @@
+use crate::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages};
 use crate::{
     render_resource::{Texture, TextureView},
     renderer::RenderDevice,
 };
 use bevy_ecs::{prelude::ResMut, system::Resource};
 use bevy_utils::{Entry, HashMap};
+use std::pin::Pin;
 use wgpu::{TextureDescriptor, TextureViewDescriptor};
 
 /// The internal representation of a [`CachedTexture`] used to track whether it was recently used
@@ -24,22 +26,35 @@ pub struct CachedTexture {
     pub default_view: TextureView,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct OwnedTextureDescriptor {
+    pub label: Option<String>,
+    pub size: Extent3d,
+    pub mip_level_count: u32,
+    pub sample_count: u32,
+    pub dimension: TextureDimension,
+    pub format: TextureFormat,
+    pub usage: TextureUsages,
+    pub view_formats: Vec<TextureFormat>,
+}
+
 /// This resource caches textures that are created repeatedly in the rendering process and
 /// are only required for one frame.
 #[derive(Resource, Default)]
 pub struct TextureCache {
-    textures: HashMap<wgpu::TextureDescriptor<'static>, Vec<CachedTextureMeta>>,
+    textures: std::sync::Mutex<HashMap<OwnedTextureDescriptor, Vec<CachedTextureMeta>>>,
 }
 
 impl TextureCache {
     /// Retrieves a texture that matches the `descriptor`. If no matching one is found a new
     /// [`CachedTexture`] is created.
     pub fn get(
-        &mut self,
+        &self,
         render_device: &RenderDevice,
-        descriptor: TextureDescriptor<'static>,
+        descriptor: OwnedTextureDescriptor,
     ) -> CachedTexture {
-        match self.textures.entry(descriptor) {
+        let mut guard = self.textures.lock().unwrap();
+        match guard.entry(descriptor.clone()) {
             Entry::Occupied(mut entry) => {
                 for texture in entry.get_mut().iter_mut() {
                     if !texture.taken {
@@ -52,7 +67,16 @@ impl TextureCache {
                     }
                 }
 
-                let texture = render_device.create_texture(&entry.key().clone());
+                let texture = render_device.create_texture(&TextureDescriptor {
+                    label: None,
+                    size: descriptor.size,
+                    mip_level_count: descriptor.mip_level_count,
+                    sample_count: descriptor.sample_count,
+                    dimension: descriptor.dimension,
+                    format: descriptor.format,
+                    usage: descriptor.usage,
+                    view_formats: descriptor.view_formats.as_slice(),
+                });
                 let default_view = texture.create_view(&TextureViewDescriptor::default());
                 entry.get_mut().push(CachedTextureMeta {
                     texture: texture.clone(),
@@ -66,7 +90,17 @@ impl TextureCache {
                 }
             }
             Entry::Vacant(entry) => {
-                let texture = render_device.create_texture(entry.key());
+                let descriptor = entry.key();
+                let texture = render_device.create_texture(&TextureDescriptor {
+                    label: None,
+                    size: descriptor.size,
+                    mip_level_count: descriptor.mip_level_count,
+                    sample_count: descriptor.sample_count,
+                    dimension: descriptor.dimension,
+                    format: descriptor.format,
+                    usage: descriptor.usage,
+                    view_formats: descriptor.view_formats.as_slice(),
+                });
                 let default_view = texture.create_view(&TextureViewDescriptor::default());
                 entry.insert(vec![CachedTextureMeta {
                     texture: texture.clone(),
@@ -84,7 +118,8 @@ impl TextureCache {
 
     /// Updates the cache and only retains recently used textures.
     pub fn update(&mut self) {
-        for textures in self.textures.values_mut() {
+        let mut guard = self.textures.lock().unwrap();
+        for textures in guard.values_mut() {
             for texture in textures.iter_mut() {
                 texture.frames_since_last_use += 1;
                 texture.taken = false;

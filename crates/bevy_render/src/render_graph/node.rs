@@ -1,8 +1,9 @@
+use crate::render_graph::{ComputedSlotDescriptor, InputSlotInfos, OutputSlotInfo};
 use crate::{
     define_atomic_id,
     render_graph::{
-        Edge, InputSlotError, OutputSlotError, RenderGraphContext, RenderGraphError,
-        RunSubGraphError, SlotInfo, SlotInfos,
+        Edge, InputSlotError, InputSlotInfo, OutputSlotError, RenderGraphContext, RenderGraphError,
+        RunSubGraphError,
     },
     renderer::RenderContext,
 };
@@ -27,17 +28,24 @@ define_atomic_id!(NodeId);
 ///
 /// A node can produce outputs used as dependencies by other nodes.
 /// Those inputs and outputs are called slots and are the default way of passing render data
-/// inside the graph. For more information see [`SlotType`](super::SlotType).
+/// inside the graph. For more information see [`SlotType`](super::InputSlotDescriptor).
 pub trait Node: Downcast + Send + Sync + 'static {
     /// Specifies the required input slots for this node.
     /// They will then be available during the run method inside the [`RenderGraphContext`].
-    fn input(&self) -> Vec<SlotInfo> {
+    fn input(&self) -> Vec<InputSlotInfo> {
+        Vec::new()
+    }
+
+    fn output(&self) -> Vec<InputSlotInfo> {
         Vec::new()
     }
 
     /// Specifies the produced output slots for this node.
     /// They can then be passed one inside [`RenderGraphContext`] during the run method.
-    fn output(&self) -> Vec<SlotInfo> {
+    fn get_outputs(
+        &self,
+        input_slot_descriptors: &[ComputedSlotDescriptor],
+    ) -> Vec<ComputedSlotDescriptor> {
         Vec::new()
     }
 
@@ -189,14 +197,30 @@ pub struct NodeState {
     /// The name of the type that implements [`Node`].
     pub type_name: &'static str,
     pub node: Box<dyn Node>,
-    pub input_slots: SlotInfos,
-    pub output_slots: SlotInfos,
+    pub input_slots: InputSlotInfos,
+    pub output_slots: InputSlotInfos,
     pub edges: Edges,
 }
 
 impl Debug for NodeState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:?} ({:?})", self.id, self.name)
+    }
+}
+
+/// The internal representation of a slot, which specifies its [`SlotType`] and name.
+#[derive(Clone, Debug)]
+pub struct SlotInfo {
+    pub name: Cow<'static, str>,
+    pub input_slot_info: InputSlotInfo,
+}
+
+impl SlotInfo {
+    pub fn new(name: impl Into<Cow<'static, str>>, input_slot_info: InputSlotInfo) -> Self {
+        SlotInfo {
+            name: name.into(),
+            input_slot_info,
+        }
     }
 }
 
@@ -401,7 +425,7 @@ where
         let Ok(view) = self
             .view_query
             .get_manual(world, graph.view_entity())
-        else { return Ok(()); };
+            else { return Ok(()); };
 
         ViewNode::run(&self.node, graph, render_context, view, world)?;
         Ok(())
